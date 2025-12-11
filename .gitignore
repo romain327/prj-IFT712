@@ -7,3 +7,5 @@ __pycache__/
 
 data/
 _results/
+.DS_Store
+_models/
