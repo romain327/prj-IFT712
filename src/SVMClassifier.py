@@ -12,10 +12,9 @@ from src.Model import Model
 # @details Utilise un pipeline Scikit-learn incluant une standardisation,
 #          une réduction de dimension (PCA) conservant 95% de variance, et un SVC à noyau RBF.
 class SVMClassifier(Model):
-    """Classificateur SVM adapté."""
 
-    def __init__(self, n_train, n_val):
-        super().__init__(n_train, n_val, model_name="SVM")
+    def __init__(self, logger, n_train, n_val):
+        super().__init__(logger, n_train, n_val, model_name="SVM")
 
     ##
     # @brief Crée le pipeline SVM.

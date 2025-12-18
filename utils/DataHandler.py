@@ -2,19 +2,23 @@ import os
 import pickle
 import numpy as np
 
+from utils.SingletonMeta import SingletonMeta
+
 
 ##
 # @class DataHandler
 # @brief Gestionnaire de données pour le chargement et le prétraitement du dataset CIFAR-10.
 # @details Cette classe s'occupe de lire les fichiers binaires (pickle), de charger les données d'entraînement et de test,
 #          de normaliser les pixels et de redimensionner les images selon les besoins des modèles.
-class DataHandler:
+class DataHandler(metaclass=SingletonMeta):
 
     ##
     # @brief Initialise le gestionnaire de données.
+    # @param logger (utils.Logger) logger pour affichage dans la console
     # @param base_path (str) Chemin vers le dossier contenant les fichiers du dataset (data_batch_x).
     # @throws FileNotFoundError Si le dossier spécifié n'existe pas.
-    def __init__(self, base_path: str):
+    def __init__(self, logger, base_path: str):
+        self.logger = logger
         self.base_path = base_path
         self.data = None
         self.train_data = None
@@ -60,7 +64,6 @@ class DataHandler:
     # @param normalize (bool) Si True, divise les valeurs des pixels par 255.0 (float). Sinon, garde les valeurs brutes.
     # @param flatten (bool) Si True, retourne les images sous forme de vecteurs (N, 3072).
     #        Si False, retourne les images sous forme de tenseurs (N, 3, 32, 32).
-    # @return dict Dictionnaire complet contenant "train_data", "train_labels", "test_data", "test_labels".
     def load_data(self, normalize: bool = True, flatten: bool = True) -> dict:
         train_files = [f"data_batch_{i}" for i in range(1, 6)]
         test_file = "test_batch"
@@ -68,7 +71,7 @@ class DataHandler:
         train_data = []
         train_labels = []
 
-        print("Loading training data...")
+        self.logger.log("Loading training data...", "INFO")
         for filename in train_files:
             batch = self.unpickle(filename)
             train_data.append(batch[b"data"])
@@ -78,7 +81,7 @@ class DataHandler:
         train_data = np.vstack(train_data)  # shape (50000, 3072)
         train_labels = np.array(train_labels, dtype=np.int64)
 
-        print("Loading test data...")
+        self.logger.log("Loading test data...", "INFO")
         test_batch = self.unpickle(test_file)
 
         test_data = np.array(test_batch[b"data"])
@@ -109,11 +112,10 @@ class DataHandler:
             "test_labels": test_labels,
         }
 
-        print(
-            f"Data loaded: {len(train_data)} train samples, {len(test_data)} test samples"
+        self.logger.log(
+            f"Data loaded: {len(train_data)} train samples, {len(test_data)} test samples",
+            "INFO",
         )
-
-        return self.data
 
     ##
     # @brief Retourne les données d'entraînement (X, y).
@@ -176,24 +178,14 @@ class DataHandler:
         labels = self.train_labels if dataset == "train" else self.test_labels
         unique, counts = np.unique(labels, return_counts=True)
 
-        class_names = [
-            "airplane",
-            "automobile",
-            "bird",
-            "cat",
-            "deer",
-            "dog",
-            "frog",
-            "horse",
-            "ship",
-            "truck",
-        ]
+        distribution = {self.class_names[i]: count for i, count in zip(unique, counts)}
 
-        distribution = {class_names[i]: count for i, count in zip(unique, counts)}
-
-        print(f"\nClass distribution ({dataset}):")
+        self.logger.log(f"\nClass distribution ({dataset}):", "RESULT")
         for class_name, count in distribution.items():
-            print(f"  {class_name:12s}: {count:5d} ({count / len(labels) * 100:.1f}%)")
+            self.logger.log(
+                f"  {class_name:12s}: {count:5d} ({count / len(labels) * 100:.1f}%)",
+                "RESULT",
+            )
 
         return distribution
 
@@ -230,3 +222,9 @@ class DataHandler:
     # @return list Liste de chaînes de caractères.
     def get_class_names(self):
         return self.class_names
+
+    ##
+    # @brief Retourne les données
+    # @return dict Dictionnaire complet contenant "train_data", "train_labels", "test_data", "test_labels".
+    def get_data(self):
+        return self.data

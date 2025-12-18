@@ -8,8 +8,8 @@ from src.Model import Model
 # @extends Model
 # @details Ensemble de 100 arbres de décision, utilisant tous les cœurs CPU disponibles (n_jobs=-1).
 class RandomForestClassifier(Model):
-    def __init__(self, n_train, n_val):
-        super().__init__(n_train, n_val, model_name="Random Forest")
+    def __init__(self, logger, n_train, n_val):
+        super().__init__(logger, n_train, n_val, model_name="Random Forest")
 
     ##
     # @brief Configure et retourne le classificateur Random Forest.

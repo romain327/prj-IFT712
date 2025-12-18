@@ -24,11 +24,13 @@ except ImportError:
 class Model(ABC):
     ##
     # @brief Constructeur de la classe Model.
+    # @param logger (utils.Logger) logger pour affichage dans la console
     # @param n_train (int) Nombre d'échantillons à utiliser pour l'entraînement.
     # @param n_val (int) Nombre d'échantillons à utiliser pour la validation.
     # @param model_name (str) Nom identifiant du modèle (par défaut "BaseModel").
     # @note Définit le chemin de sauvegarde automatique dans le dossier `_models/`.
-    def __init__(self, n_train, n_val, model_name="BaseModel"):
+    def __init__(self, logger, n_train, n_val, model_name="BaseModel"):
+        self.logger = logger
         self.n_train = n_train
         self.n_val = n_val
         self.model_name = model_name
@@ -56,7 +58,10 @@ class Model(ABC):
         X_sub = X[:limit]
         y_sub = y[:limit]
 
-        print(f"[{self.model_name}] Data split: {self.n_train} Train, {self.n_val} Val")
+        self.logger.log(
+            f"[{self.model_name}] Data split: {self.n_train} Train, {self.n_val} Val",
+            "RESULT",
+        )
 
         return train_test_split(
             X_sub,
@@ -89,7 +94,7 @@ class Model(ABC):
     # @param class_names (list, optional) Liste des noms de classes pour l'annotation de la matrice de confusion.
     # @return tuple (model, metrics) Le modèle entraîné et un dictionnaire de métriques de validation.
     def train(self, data_dict: dict, class_names=None) -> tuple:
-        print(f"[{self.model_name}] Preparing data...")
+        self.logger.log(f"[{self.model_name}] Preparing data...")
         X_train, X_val, y_train, y_val = self._prepare_data(data_dict)
 
         # Flatten automatique sauf pour le CNN
@@ -98,14 +103,16 @@ class Model(ABC):
             X_val = X_val.reshape(X_val.shape[0], -1)
 
         self.model = self._create_model()
-        print(f"[{self.model_name}] Training started...")
+        self.logger.log(f"[{self.model_name}] Training started...")
 
         self.model.fit(X_train, y_train)
 
-        print(f"[{self.model_name}] Evaluating on validation set...")
+        self.logger.log(f"[{self.model_name}] Evaluating on validation set...")
         y_pred = self.model.predict(X_val)
 
-        metrics = Metrics.calculate_metrics(y_val, y_pred, model_name=self.model_name)
+        metrics = Metrics.calculate_metrics(
+            self.logger, y_val, y_pred, model_name=self.model_name
+        )
 
         if "confusion_matrix" in metrics and class_names is not None:
             metrics["confusion_matrix_fig"] = self._generate_cm_figure(
@@ -114,8 +121,9 @@ class Model(ABC):
         else:
             metrics["confusion_matrix_fig"] = None
 
-        print(
-            f"[{self.model_name}] Validation Accuracy: {metrics.get('accuracy', 0):.4f}"
+        self.logger.log(
+            f"[{self.model_name}] Validation Accuracy: {metrics.get('accuracy', 0):.4f}",
+            "RESULT",
         )
         self.save_model()
 
@@ -136,7 +144,9 @@ class Model(ABC):
             X_test = X_test.reshape(X_test.shape[0], -1)
 
         y_pred = self.model.predict(X_test)
-        metrics = Metrics.calculate_metrics(y_test, y_pred, model_name=self.model_name)
+        metrics = Metrics.calculate_metrics(
+            self.logger, y_test, y_pred, model_name=self.model_name
+        )
 
         if "confusion_matrix" in metrics and class_names is not None:
             metrics["confusion_matrix_fig"] = self._generate_cm_figure(
@@ -169,7 +179,7 @@ class Model(ABC):
         os.makedirs("_models", exist_ok=True)
         with open(self.model_path, "wb") as f:
             pickle.dump(self.model, f)
-        print(f"[{self.model_name}] Model saved to {self.model_path}")
+        self.logger.log(f"[{self.model_name}] Model saved to {self.model_path}")
 
     ##
     # @brief Charge le modèle depuis le disque s'il existe.

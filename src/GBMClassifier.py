@@ -12,8 +12,8 @@ from src.Model import Model
 #          précédé d'une standardisation des données.
 class GBMClassifier(Model):
 
-    def __init__(self, n_train, n_val):
-        super().__init__(n_train, n_val, model_name="GBM_Classifier")
+    def __init__(self, logger, n_train, n_val):
+        super().__init__(logger, n_train, n_val, model_name="Gradient Boosting")
 
     ##
     # @brief Crée le pipeline GBM.
