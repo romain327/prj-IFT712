@@ -9,10 +9,9 @@ from src.Model import Model
 # @details Utilise `sklearn.tree.DecisionTreeClassifier` avec une profondeur maximale de 30
 #          et le critère de Gini.
 class DecisionTreeClassifier(Model):
-    """Classificateur Decision Tree adapté."""
 
-    def __init__(self, n_train, n_val):
-        super().__init__(n_train, n_val, model_name="DecisionTree")
+    def __init__(self, logger, n_train, n_val):
+        super().__init__(logger, n_train, n_val, model_name="Decision Tree")
 
     ##
     # @brief Instancie l'arbre de décision avec des hyperparamètres pré-définis.
