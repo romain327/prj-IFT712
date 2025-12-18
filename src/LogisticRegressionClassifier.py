@@ -13,8 +13,8 @@ from src.Model import Model
 #          (solver lbfgs).
 class LogisticRegressionClassifier(Model):
 
-    def __init__(self, n_train, n_val):
-        super().__init__(n_train, n_val, model_name="LogisticRegression")
+    def __init__(self, logger, n_train, n_val):
+        super().__init__(logger, n_train, n_val, model_name="Logistic Regression")
 
     ##
     # @brief Crée le pipeline de Régression Logistique.

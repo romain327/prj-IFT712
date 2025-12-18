@@ -2,6 +2,7 @@ import os.path
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import seaborn as sns
 from sklearn.metrics import (
     f1_score,
@@ -38,13 +39,14 @@ class Metrics:
     # @brief Calcule un ensemble complet de métriques de classification.
     # @details Affiche un rapport textuel dans la console (Accuracy, F1 Macro/Weighted, Precision, Recall)
     #          et retourne un dictionnaire contenant ces valeurs ainsi que la matrice de confusion brute.
+    # @param logger (utils.Logger) logger pour affichage dans la console
     # @param y_true (array-like) Les étiquettes réelles (ground truth).
     # @param y_pred (array-like) Les étiquettes prédites par le modèle.
     # @param model_name (str) Nom du modèle pour l'affichage (par défaut "Model").
     # @return dict Dictionnaire contenant les clés : 'accuracy', 'f1_macro', 'f1_weighted',
     #         'f1_per_class', 'precision_macro', 'recall_macro', 'confusion_matrix'.
     @staticmethod
-    def calculate_metrics(y_true, y_pred, model_name="Model") -> dict:
+    def calculate_metrics(logger, y_true, y_pred, model_name="Model") -> dict:
         y_true = np.array(y_true).flatten()
         y_pred = np.array(y_pred).flatten()
 
@@ -57,16 +59,16 @@ class Metrics:
         precision_macro = precision_score(y_true, y_pred, average="macro")
         recall_macro = recall_score(y_true, y_pred, average="macro")
 
-        print(f"\nOVERALL METRICS:")
-        print(f"  Accuracy:           {accuracy:.4f}")
-        print(f"  F1 Score (Macro):   {f1_macro:.4f}")
-        print(f"  F1 Score (Weighted): {f1_weighted:.4f}")
-        print(f"  Precision (Macro):  {precision_macro:.4f}")
-        print(f"  Recall (Macro):     {recall_macro:.4f}")
+        logger.log(f"\nOVERALL METRICS:", "RESULT")
+        logger.log(f"  Accuracy:           {accuracy:.4f}", "RESULT")
+        logger.log(f"  F1 Score (Macro):   {f1_macro:.4f}", "RESULT")
+        logger.log(f"  F1 Score (Weighted): {f1_weighted:.4f}", "RESULT")
+        logger.log(f"  Precision (Macro):  {precision_macro:.4f}", "RESULT")
+        logger.log(f"  Recall (Macro):     {recall_macro:.4f}", "RESULT")
 
-        print(f"\nF1 SCORE PER CLASS:")
+        logger.log(f"\nF1 SCORE PER CLASS:", "RESULT")
         for i, class_name in enumerate(class_names):
-            print(f"  {class_name:12s}: {f1_per_class[i]:.4f}")
+            logger.log(f"  {class_name:12s}: {f1_per_class[i]:.4f}", "RESULT")
 
         print(f"\nCLASSIFICATION REPORT:")
         print(classification_report(y_true, y_pred, target_names=class_names, digits=4))
@@ -133,7 +135,7 @@ class Metrics:
     @staticmethod
     def plot_training_history(
         history, model_name="Model", save_path="_results"
-    ) -> None:
+    ) -> Figure:
         if hasattr(history, "history"):
             history = history.history
 
@@ -161,6 +163,7 @@ class Metrics:
             save_name = os.path.join(save_path, model_name + ".png")
             plt.savefig(save_name, dpi=300, bbox_inches="tight")
             print(f"Training history saved to: {save_name}")
+        return fig
 
     ##
     # @brief Compare visuellement et textuellement les performances de plusieurs modèles.

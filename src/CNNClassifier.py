@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from src.Model import Model
 from utils.Metrics import Metrics
+from utils.TqdmToLogger import TqdmToLogger
 
 
 ##
@@ -83,12 +84,13 @@ class CNNArchitecture(nn.Module):
 # @details Gère spécifiquement les tenseurs PyTorch, l'utilisation du GPU (CUDA),
 #          la boucle d'entraînement manuelle et l'Early Stopping.
 class CNNClassifier(Model):
-    def __init__(self, n_train, n_val):
-        super().__init__(n_train, n_val, model_name="CNN")
+    def __init__(self, logger, n_train, n_val):
+        super().__init__(logger, n_train, n_val, model_name="CNN")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model_path = "_models/CNN.pth"
         # Structure pour stocker l'historique (compatible avec votre snippet)
         self.history = {"loss": [], "accuracy": [], "val_loss": [], "val_accuracy": []}
+        self.tqdm_out = TqdmToLogger(self.logger, "TQDM")
 
     def _create_model(self, **kwargs):
         return CNNArchitecture().to(self.device)
@@ -106,7 +108,7 @@ class CNNClassifier(Model):
     # @param class_names (list, optional) Noms des classes.
     # @return tuple (model, metrics) Le modèle PyTorch (nn.Module) et les métriques finales.
     def train(self, data_dict: dict, class_names=None) -> tuple:
-        print(f"[{self.model_name}] Using device: {self.device}")
+        self.logger.log(f"[{self.model_name}] Using device: {self.device}", "INFO")
 
         X_train_raw, X_val_raw, y_train, y_val = self._prepare_data(data_dict)
 
@@ -141,7 +143,7 @@ class CNNClassifier(Model):
         patience_counter = 0
         best_model_state = None
 
-        print(f"[{self.model_name}] Training started (Epochs=50)...")
+        self.logger.log(f"[{self.model_name}] Training started (Epochs=50)...", "INFO")
 
         for epoch in range(50):
             self.model.train()
@@ -155,6 +157,8 @@ class CNNClassifier(Model):
                 position=0,
                 leave=True,
                 ncols=100,
+                file=self.tqdm_out,
+                mininterval=1.0,
             )
 
             for batch_X, batch_y in train_pbar:
@@ -195,6 +199,8 @@ class CNNClassifier(Model):
                 position=0,
                 leave=True,
                 ncols=100,
+                file=self.tqdm_out,
+                mininterval=1.0,
             )
 
             with torch.no_grad():
@@ -230,11 +236,9 @@ class CNNClassifier(Model):
             current_lr = optimizer.param_groups[0]["lr"]
             scheduler.step(val_loss)
 
-            print(
-                f"Epoch {epoch + 1:2d}/50 Summary - "
-                f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f} | "
-                f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f} | "
-                f"LR: {current_lr:.2e}"
+            self.logger.log(
+                f"Epoch {epoch + 1:2d}/50 Summary - Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f} | LR: {current_lr:.2e}",
+                "RESULT",
             )
 
             # Early Stopping
@@ -250,16 +254,17 @@ class CNNClassifier(Model):
 
         if best_model_state is not None:
             self.model.load_state_dict(best_model_state)
-            print("Restored best model based on validation loss.")
+            self.logger.log("Restored best model based on validation loss.", "INFO")
 
         # 4. Évaluation Finale pour le retour (Compatible Controller)
-        print(f"[{self.model_name}] Generating final metrics...")
+        self.logger.log(f"[{self.model_name}] Generating final metrics...", "INFO")
         val_preds = self._predict_batch(X_val, y_val_t)
 
         metrics = Metrics.calculate_metrics(
-            y_val, val_preds, model_name=self.model_name
+            self.logger, y_val, val_preds, model_name=self.model_name
         )
-        Metrics.plot_training_history(self.history, "cnn")
+
+        metrics["history_fig"] = Metrics.plot_training_history(self.history, "cnn")
 
         metrics["loss"] = best_val_loss
 
@@ -295,14 +300,16 @@ class CNNClassifier(Model):
         X_test_t = torch.FloatTensor(X_test).permute(0, 3, 1, 2)
         y_test_t = torch.LongTensor(y_test)
 
-        print(f"[{self.model_name}] Testing on {len(X_test)} samples...")
+        self.logger.log(
+            f"[{self.model_name}] Testing on {len(X_test)} samples...", "INFO"
+        )
 
         # Inférence par batch
         test_preds = self._predict_batch(X_test_t, y_test_t)
 
         # Calcul métriques
         metrics = Metrics.calculate_metrics(
-            y_test, test_preds, model_name=self.model_name
+            self.logger, y_test, test_preds, model_name=self.model_name
         )
 
         if "confusion_matrix" in metrics and class_names is not None:
@@ -318,7 +325,6 @@ class CNNClassifier(Model):
     # @param y_tensor (torch.Tensor) Labels (utilisés uniquement pour créer le Dataset compatible).
     # @return np.ndarray Tableau numpy des classes prédites.
     def _predict_batch(self, X_tensor, y_tensor):
-        """Helper pour faire des prédictions par batch (évite OOM)."""
         self.model.eval()
         loader = DataLoader(
             TensorDataset(X_tensor, y_tensor), batch_size=32, shuffle=False
@@ -327,7 +333,14 @@ class CNNClassifier(Model):
 
         with torch.no_grad():
             # Une simple barre de progression pour l'inférence
-            for batch_X, _ in tqdm(loader, desc="Inference", unit="batch", leave=False):
+            for batch_X, _ in tqdm(
+                loader,
+                desc="Inference",
+                unit="batch",
+                leave=False,
+                file=self.tqdm_out,
+                mininterval=1.0,
+            ):
                 batch_X = batch_X.to(self.device)
                 outputs = self.model(batch_X)
                 preds = outputs.argmax(1).cpu().numpy()
@@ -361,7 +374,7 @@ class CNNClassifier(Model):
     def save_model(self) -> None:
         os.makedirs("_models", exist_ok=True)
         torch.save(self.model.state_dict(), self.model_path)
-        print(f"[{self.model_name}] Model saved to {self.model_path}")
+        self.logger.log(f"[{self.model_name}] Model saved to {self.model_path}", "INFO")
 
     ##
     # @brief Charge les poids du modèle (state_dict) via torch.load.
